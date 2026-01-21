@@ -1,5 +1,4 @@
 .env
 __pycache__/
-news/
 venv/
 .DS_Store
