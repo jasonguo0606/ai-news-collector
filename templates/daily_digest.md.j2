@@ -4,12 +4,12 @@
 > **新闻条数**: {{ total_count }} 条
 
 {% for category, items in news_by_category.items() %}
-## {{ category_icons[category] }} {{ category }}
+## {{ category }}
 {% for item in items %}
 ### [{{ item.zh_title }}]({{ item.url }})
 > **摘要**: {{ item.summary }}
 > **标签**: {% for tag in item.tags %} #{{ tag }} {% endfor %}
-> **来源**: {{ item.source }} | **评分**: {{ "⭐" * item.score }}
+> **来源**: {{ item.source }} | **评分**: {{ "⭐" * item.ai_score }}
 
 {% endfor %}
 ---
