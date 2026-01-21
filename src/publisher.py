@@ -2,7 +2,7 @@ import os
 import datetime
 from typing import List, Dict
 from jinja2 import Environment, FileSystemLoader
-from .collector import NewsItem
+from collector import NewsItem
 
 class MarkdownPublisher:
     def __init__(self):

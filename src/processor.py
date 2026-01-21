@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import List
 from openai import OpenAI
 from tenacity import retry, stop_after_attempt, wait_fixed
-from .collector import NewsItem
+from collector import NewsItem
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
