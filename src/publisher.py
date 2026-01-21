@@ -44,6 +44,9 @@ class MarkdownPublisher:
         template = self.env.get_template("daily_digest.md.j2")
         output_content = template.render(context)
 
+        # Ensure directory exists
+        os.makedirs(self.output_dir, exist_ok=True)
+
         # Write to file
         output_file = os.path.join(self.output_dir, f"{today_str}.md")
         with open(output_file, "w", encoding="utf-8") as f:
