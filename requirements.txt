@@ -1,0 +1,7 @@
+requests
+praw
+openai
+jinja2
+python-dotenv
+tenacity
+mdutils
