@@ -24,10 +24,35 @@ class NewsItem:
     tags: List[str] = field(default_factory=list)
     ai_score: int = 0
 
+# Shared AI keyword filter
+AI_KEYWORDS = [
+    # Core AI Terms
+    'AI', 'Artificial Intelligence', '人工智能',
+    'LLM', 'Large Language Model', '大语言模型', '大模型',
+    'GPT', 'ChatGPT', 'Claude', 'Gemini', 'Llama', 'Mistral', 'Qwen', '通义', '文心',
+    # Companies & Labs
+    'OpenAI', 'Anthropic', 'DeepMind', 'Google AI', 'Meta AI', 'Baidu AI', '百度', '阿里', 'Alibaba',
+    # Technologies
+    'Transformer', 'Diffusion', 'Generative', 'Neural Network', '神经网络',
+    'Machine Learning', 'Deep Learning', '机器学习', '深度学习',
+    'Computer Vision', 'NLP', 'Natural Language', '自然语言',
+    'Reinforcement Learning', '强化学习',
+    'RAG', 'Agent', 'Embedding', 'Fine-tuning', '微调', 'Prompt',
+    # Applications
+    'Text-to-Image', 'Image Generation', 'Video Generation', 'AIGC',
+    'Chatbot', 'Virtual Assistant', 'AI编程', 'Copilot', 'Code Generation',
+    # Research & Papers
+    'arXiv', 'Paper', 'Model', 'Dataset', 'Benchmark', 'Algorithm',
+]
+
+def is_ai_related(title: str, content: str = "") -> bool:
+    """Check if news item is AI-related using keyword matching."""
+    text = (title + " " + content).lower()
+    return any(keyword.lower() in text for keyword in AI_KEYWORDS)
+
 class HackerNewsCollector:
     def __init__(self):
         self.base_url = "https://hacker-news.firebaseio.com/v0"
-        self.keywords = ['AI', 'LLM', 'GPT', 'Transformer', 'Diffusion', 'Generative', 'Machine Learning', 'Neural', 'DeepMind', 'OpenAI', 'Anthropic', 'Llama', 'Mistral', 'Gemini']
 
     def fetch_item(self, item_id):
         try:
@@ -53,8 +78,8 @@ class HackerNewsCollector:
                 continue
             
             title = item['title']
-            # Keyword filtering
-            if any(k.lower() in title.lower() for k in self.keywords):
+            # AI keyword filtering
+            if is_ai_related(title):
                 news_items.append(NewsItem(
                     title=title,
                     url=item['url'],
@@ -76,7 +101,7 @@ class RedditCollector:
             client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
             user_agent=os.getenv("REDDIT_USER_AGENT", "python:ai-news-collector:v1.0")
         )
-        self.subreddits = ["MachineLearning", "LocalLLaMA", "Singularity", "ArtificialIntelligences"]
+        self.subreddits = ["MachineLearning", "LocalLLaMA", "Singularity", "ArtificialIntelligence"]
 
     def collect(self, limit=10) -> List[NewsItem]:
         print("Fetching Reddit...")
@@ -89,7 +114,13 @@ class RedditCollector:
                     if submission.stickied:
                         continue
                     
+                    # Filter out questions/help posts
                     if "question" in submission.title.lower() or "help" in submission.title.lower():
+                        continue
+                    
+                    # Apply AI keyword filter
+                    content = submission.selftext[:1000] if submission.selftext else ""
+                    if not is_ai_related(submission.title, content):
                         continue
 
                     news_items.append(NewsItem(
@@ -97,7 +128,7 @@ class RedditCollector:
                         url=submission.url,
                         source=f"Reddit/{sub_name}",
                         original_id=submission.id,
-                        content_snippet=submission.selftext[:1000] if submission.selftext else "", # Increased snippet length
+                        content_snippet=content,
                         score=submission.score,
                         comments_count=submission.num_comments
                     ))
@@ -110,19 +141,11 @@ class RedditCollector:
 
 class RSSCollector:
     def __init__(self):
-        # Selected high-quality Chinese AI Tech Blogs
-        self.feeds = {
-            "机器之心": "https://www.jiqizhixin.com/rss",
-            "量子位": "https://www.qbitai.com/feed",
-            "36Kr-AI": "https://36kr.com/feed-tags/ai", # Note: 36kr tag feed structure might vary, generic fallback
-            "AI-Hub": "https://rsshub.app/ai/news",  # Example aggregator if available
-        }
-        # Filter for strictly RSS URLs that work directly without heavy anti-bot
-        # Using a safer list for stability
+        # Selected high-quality Chinese AI Tech sources
         self.feeds = [
             ("机器之心", "https://www.jiqizhixin.com/rss"),
             ("量子位", "https://www.qbitai.com/feed"),
-            ("InfoQ-AI", "https://www.infoq.cn/feed/topic/33"), # InfoQ AI Topic
+            ("InfoQ-AI", "https://www.infoq.cn/feed/topic/33"),
         ]
 
     def collect(self, limit=10) -> List[NewsItem]:
@@ -134,8 +157,7 @@ class RSSCollector:
                 feed = feedparser.parse(feed_url)
                 count = 0
                 for entry in feed.entries:
-                    # Filter by date? Let's just take top N latest
-                    if count >= 3: # Limit per source
+                    if count >= 3:  # Limit per source
                         break
                         
                     # Basic content extraction
@@ -145,16 +167,17 @@ class RSSCollector:
                     elif 'description' in entry:
                         content = entry.description
                     
-                    # Remove HTML tags roughly for snippet if needed, 
-                    # but Processor handles text better. Let's keep raw text for now or truncate.
+                    # Apply AI keyword filter
+                    if not is_ai_related(entry.title, content):
+                        continue
                     
                     news_items.append(NewsItem(
                         title=entry.title,
                         url=entry.link,
                         source=f"媒体/{source_name}",
                         original_id=entry.link,
-                        content_snippet=content[:1000], # Provide more context
-                        score=0, # RSS doesn't have scores usually
+                        content_snippet=content[:1000],
+                        score=0,
                         comments_count=0
                     ))
                     count += 1
