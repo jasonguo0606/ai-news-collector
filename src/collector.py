@@ -2,6 +2,7 @@ import os
 import time
 import requests
 import praw
+import feedparser
 from dataclasses import dataclass, field
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor
@@ -10,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 class NewsItem:
     title: str
     url: str
-    source: str  # 'HN' or 'Reddit'
+    source: str  # 'HN', 'Reddit', or 'RSS/SourceName'
     original_id: str
     content_snippet: str = ""
     score: int = 0
@@ -18,6 +19,7 @@ class NewsItem:
     # Processed fields
     zh_title: Optional[str] = None
     summary: Optional[str] = None
+    key_points: List[str] = field(default_factory=list)  # New field for bullet points
     category: Optional[str] = None
     tags: List[str] = field(default_factory=list)
     ai_score: int = 0
@@ -25,7 +27,7 @@ class NewsItem:
 class HackerNewsCollector:
     def __init__(self):
         self.base_url = "https://hacker-news.firebaseio.com/v0"
-        self.keywords = ['AI', 'LLM', 'GPT', 'Transformer', 'Diffusion', 'Generative', 'Machine Learning', 'Neural', 'DeepMind', 'OpenAI', 'Anthropic', 'Llama', 'Mistral']
+        self.keywords = ['AI', 'LLM', 'GPT', 'Transformer', 'Diffusion', 'Generative', 'Machine Learning', 'Neural', 'DeepMind', 'OpenAI', 'Anthropic', 'Llama', 'Mistral', 'Gemini']
 
     def fetch_item(self, item_id):
         try:
@@ -87,8 +89,6 @@ class RedditCollector:
                     if submission.stickied:
                         continue
                     
-                    # Basic filtering for 'Help' or 'Question' flairs if possible, 
-                    # but simple text filtering is safer.
                     if "question" in submission.title.lower() or "help" in submission.title.lower():
                         continue
 
@@ -97,14 +97,69 @@ class RedditCollector:
                         url=submission.url,
                         source=f"Reddit/{sub_name}",
                         original_id=submission.id,
-                        content_snippet=submission.selftext[:500] if submission.selftext else "",
+                        content_snippet=submission.selftext[:1000] if submission.selftext else "", # Increased snippet length
                         score=submission.score,
                         comments_count=submission.num_comments
                     ))
         except Exception as e:
             print(f"Error fetching Reddit: {e}")
         
-        # Deduplicate by URL
         unique_items = {item.url: item for item in news_items}.values()
         print(f"Collected {len(unique_items)} items from Reddit.")
         return list(unique_items)
+
+class RSSCollector:
+    def __init__(self):
+        # Selected high-quality Chinese AI Tech Blogs
+        self.feeds = {
+            "机器之心": "https://www.jiqizhixin.com/rss",
+            "量子位": "https://www.qbitai.com/feed",
+            "36Kr-AI": "https://36kr.com/feed-tags/ai", # Note: 36kr tag feed structure might vary, generic fallback
+            "AI-Hub": "https://rsshub.app/ai/news",  # Example aggregator if available
+        }
+        # Filter for strictly RSS URLs that work directly without heavy anti-bot
+        # Using a safer list for stability
+        self.feeds = [
+            ("机器之心", "https://www.jiqizhixin.com/rss"),
+            ("量子位", "https://www.qbitai.com/feed"),
+            ("InfoQ-AI", "https://www.infoq.cn/feed/topic/33"), # InfoQ AI Topic
+        ]
+
+    def collect(self, limit=10) -> List[NewsItem]:
+        print("Fetching RSS Feeds (CN)...")
+        news_items = []
+        
+        for source_name, feed_url in self.feeds:
+            try:
+                feed = feedparser.parse(feed_url)
+                count = 0
+                for entry in feed.entries:
+                    # Filter by date? Let's just take top N latest
+                    if count >= 3: # Limit per source
+                        break
+                        
+                    # Basic content extraction
+                    content = ""
+                    if 'summary' in entry:
+                        content = entry.summary
+                    elif 'description' in entry:
+                        content = entry.description
+                    
+                    # Remove HTML tags roughly for snippet if needed, 
+                    # but Processor handles text better. Let's keep raw text for now or truncate.
+                    
+                    news_items.append(NewsItem(
+                        title=entry.title,
+                        url=entry.link,
+                        source=f"媒体/{source_name}",
+                        original_id=entry.link,
+                        content_snippet=content[:1000], # Provide more context
+                        score=0, # RSS doesn't have scores usually
+                        comments_count=0
+                    ))
+                    count += 1
+            except Exception as e:
+                print(f"Error fetching RSS {source_name}: {e}")
+
+        print(f"Collected {len(news_items)} items from RSS.")
+        return news_items

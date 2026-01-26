@@ -6,10 +6,18 @@
 {% for category, items in news_by_category.items() %}
 ## {{ category }}
 {% for item in items %}
-### [{{ item.zh_title }}]({{ item.url }})
+### {{ item.zh_title }}
 > **摘要**: {{ item.summary }}
+{% if item.key_points %}
+> **核心要点**:
+{% for point in item.key_points %}
+> * {{ point }}
+{% endfor %}
+{% endif %}
 > **标签**: {% for tag in item.tags %} #{{ tag }} {% endfor %}
 > **来源**: {{ item.source }} | **评分**: {{ "⭐" * item.ai_score }}
+>
+> 🔗 [阅读原文]({{ item.url }})
 
 {% endfor %}
 ---

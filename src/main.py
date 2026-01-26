@@ -1,7 +1,7 @@
 import os
 import sys
 from dotenv import load_dotenv
-from collector import HackerNewsCollector, RedditCollector
+from collector import HackerNewsCollector, RedditCollector, RSSCollector
 from processor import AIProcessor
 from publisher import MarkdownPublisher
 
@@ -14,10 +14,16 @@ def main():
     # 1. Collection
     hn_collector = HackerNewsCollector()
     reddit_collector = RedditCollector()
+    rss_collector = RSSCollector()
     
     raw_items = []
+    
+    # Collect from RSS (High quality, prioritized)
+    raw_items.extend(rss_collector.collect(limit=10))
+
     # Collect from HN
     raw_items.extend(hn_collector.collect(limit=30))
+    
     # Collect from Reddit (Optional: Check if configured)
     if os.getenv("REDDIT_CLIENT_ID"):
         raw_items.extend(reddit_collector.collect(limit=20))
